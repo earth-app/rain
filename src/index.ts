@@ -1,7 +1,6 @@
 import { createCanvas, Image, type CanvasRenderingContext2D } from 'canvas';
 import { program } from 'commander';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import sharp from 'sharp';
 import {
 	eventThumbnailURL,
 	getRandomActivities,
@@ -113,33 +112,50 @@ async function randomEvent(): Promise<CanvasRenderingContext2D> {
 
 	// Event Thumbnail - below fillIn content, centered
 
-	// webp must be converted to png before use
 	const thumbnailURL = eventThumbnailURL(event.id);
-	const thumbnailData = await fetch(thumbnailURL).then((res) => res.arrayBuffer());
-	const thumbnailPNG = await sharp(Buffer.from(thumbnailData)).png().toBuffer();
-	const thumbnailDataURL = `data:image/png;base64,${thumbnailPNG.toString('base64')}`;
-
-	const thumbnailImage = new Image();
 	const thumbnailWidth = 720;
 	const thumbnailHeight = thumbnailWidth * (9 / 16);
 
-	await new Promise<void>((resolve) => {
-		thumbnailImage.onload = () => {
-			ctx.drawImage(
-				thumbnailImage,
-				ctx.canvas.width / 2 - thumbnailWidth / 2,
-				450,
-				thumbnailWidth,
-				thumbnailHeight
+	try {
+		const thumbnailResponse = await fetch(thumbnailURL);
+		if (!thumbnailResponse.ok) {
+			console.warn(
+				`Failed to fetch event thumbnail (${thumbnailResponse.status}), skipping thumbnail`
 			);
-			resolve();
-		};
-		thumbnailImage.onerror = (err) => {
-			console.warn('Failed to load event thumbnail, skipping', err);
-			resolve();
-		};
-		thumbnailImage.src = thumbnailDataURL;
-	});
+			return ctx;
+		}
+
+		const contentType = thumbnailResponse.headers.get('content-type')?.toLowerCase() ?? '';
+		if (!contentType.startsWith('image/')) {
+			console.warn(
+				`Unexpected thumbnail response type "${contentType || 'unknown'}", skipping thumbnail`
+			);
+			return ctx;
+		}
+
+		const thumbnailImage = new Image();
+		const thumbnailBuffer = Buffer.from(await thumbnailResponse.arrayBuffer());
+
+		await new Promise<void>((resolve) => {
+			thumbnailImage.onload = () => {
+				ctx.drawImage(
+					thumbnailImage,
+					ctx.canvas.width / 2 - thumbnailWidth / 2,
+					450,
+					thumbnailWidth,
+					thumbnailHeight
+				);
+				resolve();
+			};
+			thumbnailImage.onerror = (err) => {
+				console.warn('Failed to decode event thumbnail, skipping', err);
+				resolve();
+			};
+			thumbnailImage.src = thumbnailBuffer;
+		});
+	} catch (error) {
+		console.warn('Failed to load event thumbnail, skipping', error);
+	}
 
 	return ctx;
 }
