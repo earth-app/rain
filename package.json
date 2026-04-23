@@ -3,26 +3,32 @@
   "name": "@earth-app/rain",
   "version": "1.0.0",
   "type": "module",
-  "main": "src/index.ts",
   "scripts": {
-    "create:activity": "bun src/index.ts --type=activity",
-    "create:prompt": "bun src/index.ts --type=prompt",
-    "create:event": "bun src/index.ts --type=event",
-    "create:article": "bun src/index.ts --type=article",
-    "create:all": "bun run create:activity && bun run create:prompt && bun run create:event && bun run create:article",
+    "photo:activity": "bun src/photos/index.ts --type=activity",
+    "photo:prompt": "bun src/photos/index.ts --type=prompt",
+    "photo:event": "bun src/photos/index.ts --type=event",
+    "photo:article": "bun src/photos/index.ts --type=article",
+    "photo:all": "bun run photo:activity && bun run photo:prompt && bun run photo:event && bun run photo:article",
+    "video:prompt": "bun src/videos/generate-prompt.ts",
+    "video:studio": "bunx remotion studio src/videos/index.ts --public-dir src/assets",
     "prettier": "bunx prettier --write .",
     "prettier:check": "bunx prettier --check .",
     "prepare": "husky install"
   },
   "dependencies": {
+    "@remotion/cli": "4.0.451",
     "canvas": "^3.2.3",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "music-metadata": "^11.12.3",
+    "react": "^19.2.5",
+    "remotion": "4.0.451"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@types/bun": "^1.3.12",
+    "@types/bun": "^1.3.13",
+    "@types/react": "^19.2.14",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
