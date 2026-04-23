@@ -8,7 +8,7 @@ import {
 	getRandomEvents,
 	getRandomPrompts,
 	iconURL
-} from './api';
+} from '../api';
 import { addWatermark, fillIn } from './canvas';
 
 function start(): CanvasRenderingContext2D {

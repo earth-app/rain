@@ -2,7 +2,7 @@ import { fileURLToPath } from 'bun';
 import { CanvasRenderingContext2D, createCanvas, Image, registerFont } from 'canvas';
 
 export const NOTO_SANS = registerFont(
-	fileURLToPath(new URL('./assets/NotoSans.ttf', import.meta.url)),
+	fileURLToPath(new URL('../assets/NotoSans.ttf', import.meta.url)),
 	{
 		family: 'Noto Sans',
 		weight: '400'
