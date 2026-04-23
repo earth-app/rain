@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+command -v git-lfs >/dev/null 2>&1 || {
+  echo "Git LFS not installed"
+  exit 1
+}
+
+git lfs pre-push "$@"
