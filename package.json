@@ -11,6 +11,7 @@
     "photo:all": "bun run photo:activity && bun run photo:prompt && bun run photo:event && bun run photo:article",
     "video:prompt": "bun src/videos/generate-prompt.ts",
     "video:studio": "bunx remotion studio src/videos/index.ts --public-dir src/assets",
+    "upload:prompt": "bun src/upload.ts --type=prompt",
     "prettier": "bunx prettier --write .",
     "prettier:check": "bunx prettier --check .",
     "prepare": "husky install"
@@ -19,6 +20,8 @@
     "@remotion/cli": "4.0.451",
     "canvas": "^3.2.3",
     "commander": "^14.0.3",
+    "google-auth-library": "^10.6.2",
+    "googleapis": "^171.4.0",
     "music-metadata": "^11.12.3",
     "react": "^19.2.5",
     "remotion": "4.0.451"
