@@ -57,7 +57,7 @@ async function uploadPrompt() {
 				},
 				status: {
 					privacyStatus: 'public',
-					madeForKids: false
+					selfDeclaredMadeForKids: false
 				}
 			},
 			media: {
