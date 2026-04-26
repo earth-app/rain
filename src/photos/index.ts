@@ -9,6 +9,7 @@ import {
 	getRandomPrompts,
 	iconURL
 } from '../api';
+import { stripLeadingZeroes } from '../util';
 import { addWatermark, fillIn } from './canvas';
 
 function start(): CanvasRenderingContext2D {
@@ -67,7 +68,7 @@ async function randomPrompt(): Promise<CanvasRenderingContext2D> {
 	ctx.fillText(header, ctx.canvas.width / 2 - ctx.measureText(header).width / 2, 40);
 
 	// remove leading zeroes
-	const id = prompt.id.replace(/^0+/, '');
+	const id = stripLeadingZeroes(prompt.id);
 	await fillIn(
 		prompt.prompt,
 		`By @${prompt.owner.username} | #${id}`,
@@ -100,7 +101,7 @@ async function randomEvent(): Promise<CanvasRenderingContext2D> {
 		event.type === 'IN_PERSON' ? 'In-Person' : event.type === 'ONLINE' ? 'Online' : 'Hybrid';
 
 	// remove leading zeroes
-	const id = event.id.replace(/^0+/, '');
+	const id = stripLeadingZeroes(event.id);
 	await fillIn(
 		event.name,
 		`Hosted by @${event.host.username} - ${type} | #${id}`,
@@ -183,7 +184,7 @@ async function randomArticle(): Promise<CanvasRenderingContext2D> {
 			: article.content;
 
 	// remove leading zeroes
-	const id = article.id.replace(/^0+/, '');
+	const id = stripLeadingZeroes(article.id);
 	await fillIn(
 		article.title,
 		`By @${article.author.username} | #${id}`,

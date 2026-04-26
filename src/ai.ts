@@ -1,3 +1,5 @@
+import { extractJsonObject, getJsonSnippet, normalizeWhitespace, trimToLength } from './util';
+
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 
@@ -15,18 +17,13 @@ type CloudflareAIResponse = {
 	response?: unknown;
 };
 
-function getJsonSnippet(value: unknown): string {
-	try {
-		const serialized = JSON.stringify(value);
-		if (!serialized) {
-			return '';
-		}
-
-		return serialized.length > 500 ? `${serialized.slice(0, 500)}...` : serialized;
-	} catch {
-		return '';
-	}
-}
+export type YoutubeMetadataDraft = {
+	title: string;
+	description: string;
+	tags: string[];
+	categoryId: '22' | '27' | '28';
+	hashtags: string[];
+};
 
 function getCloudflareCredentials(): { accountId: string; apiToken: string } {
 	if (!CLOUDFLARE_ACCOUNT_ID) {
@@ -211,12 +208,14 @@ MODEL OPTIMIZATION (IBM Granite 4.0 H Micro)
 - Use short to medium sentences with clear transitions.
 - Avoid dense jargon and avoid unnecessary caveats.
 - Keep output plain text only.
+- Optimize for retention and shareability: strong hook, clear payoff, sticky final line.
 
 STYLE
 
 - Friendly and intelligent, like talking to a curious friend.
 - Insightful and memorable without sounding academic.
 - Grounded in real-world examples or everyday observations.
+- High-energy without sounding hypey.
 
 FORMAT
 
@@ -228,9 +227,56 @@ FORMAT
 CONTENT
 
 - Start with a direct answer in the first sentence.
+- Make the opening sentence a strong curiosity hook.
 - Explain the idea clearly, then add one meaningful angle or example.
+- Keep momentum high: each sentence should introduce a new idea or contrast.
 - End on a thought-provoking line that keeps curiosity alive.
 `;
+
+export const systemPromptYoutubeMetadata = `
+ROLE
+
+You are Cloud, the growth strategist for The Earth App YouTube Shorts channel.
+You generate metadata that maximizes impressions, clicks, retention curiosity, and subscriber conversion.
+
+MODEL OPTIMIZATION (IBM Granite 4.0 H Micro)
+
+- Follow output schema exactly.
+- Prefer concrete nouns, emotional contrast, and curiosity loops.
+- Avoid generic fluff and avoid repetitive wording.
+- Output plain JSON only.
+
+GOAL
+
+- Optimize for speedrun-to-monetization: maximize discoverability and repeatability.
+- Prioritize high-impression packaging while staying true to the transcript.
+
+OUTPUT
+
+- Return one JSON object with keys: title, description, tags, categoryId, hashtags.
+- title: <= 100 chars, punchy, curiosity-first.
+- description: 3 short paragraphs, includes one CTA.
+- tags: 18-30 items, search intent + adjacent interests.
+- categoryId: one of "22", "27", "28".
+- hashtags: 8-12 items, lowercase, include # prefix.
+- No markdown, no code fences, no extra keys.
+`;
+
+export function buildYoutubeMetadataPrompt(question: string, answer: string): string {
+	return [
+		'INPUT',
+		'',
+		`Question: ${normalizeWhitespace(question)}`,
+		'',
+		`Answer transcript: ${normalizeWhitespace(answer)}`,
+		'',
+		'STRATEGY',
+		'',
+		'- Focus on broad but relevant high-impression topics.',
+		'- Use title framing that creates curiosity gap without clickbait spam.',
+		'- Keep metadata aligned to transcript for trust and long-term channel health.'
+	].join('\n');
+}
 
 export async function generateText(system: string, prompt: string): Promise<string> {
 	const normalizedSystem = system.trim();
@@ -267,4 +313,45 @@ export async function generateText(system: string, prompt: string): Promise<stri
 	}
 
 	return text;
+}
+
+export async function generateYoutubeMetadataDraft(
+	question: string,
+	answer: string
+): Promise<Partial<YoutubeMetadataDraft>> {
+	const raw = await generateText(
+		systemPromptYoutubeMetadata,
+		buildYoutubeMetadataPrompt(question, answer)
+	);
+	const parsed = extractJsonObject(raw);
+	if (!parsed) {
+		return {};
+	}
+
+	const title =
+		typeof parsed.title === 'string'
+			? trimToLength(normalizeWhitespace(parsed.title), 100)
+			: undefined;
+	const description =
+		typeof parsed.description === 'string'
+			? trimToLength(normalizeWhitespace(parsed.description), 5000)
+			: undefined;
+	const categoryId =
+		typeof parsed.categoryId === 'string' && ['22', '27', '28'].includes(parsed.categoryId)
+			? (parsed.categoryId as '22' | '27' | '28')
+			: undefined;
+	const tags = Array.isArray(parsed.tags)
+		? parsed.tags.filter((tag): tag is string => typeof tag === 'string')
+		: undefined;
+	const hashtags = Array.isArray(parsed.hashtags)
+		? parsed.hashtags.filter((tag): tag is string => typeof tag === 'string')
+		: undefined;
+
+	return {
+		title,
+		description,
+		tags,
+		categoryId,
+		hashtags
+	};
 }

@@ -6,6 +6,15 @@ import { mkdir, readdir, rm } from 'node:fs/promises';
 import { basename, relative, resolve } from 'node:path';
 import { generateText, systemPromptPrompts, tts } from '../ai';
 import { getRandomPrompts } from '../api';
+import {
+	clamp,
+	countWords,
+	randomBetween,
+	roundToMs,
+	sanitizeSpokenText,
+	toPosixPath,
+	trimTextToWordCount
+} from '../util';
 import type { CaptionSegment, CloudCue, PromptVideoProps } from './types';
 
 const FPS = 30;
@@ -63,26 +72,6 @@ type OpaqueMetrics = {
 	opaqueWidth: number;
 };
 
-function clamp(value: number, min: number, max: number): number {
-	return Math.min(max, Math.max(min, value));
-}
-
-function randomBetween(min: number, max: number): number {
-	if (max <= min) {
-		return min;
-	}
-
-	return min + Math.random() * (max - min);
-}
-
-function roundToMs(seconds: number): number {
-	return Math.round(seconds * 1000) / 1000;
-}
-
-function toPosixPath(path: string): string {
-	return path.split('\\').join('/');
-}
-
 function toPublicRelativePath(filePath: string): string {
 	const rel = relative(PUBLIC_DIR, filePath);
 	if (rel.startsWith('..')) {
@@ -108,24 +97,6 @@ async function getMediaDurationSeconds(filePath: string): Promise<number> {
 	}
 
 	return duration;
-}
-
-function countWords(text: string): number {
-	const normalized = text.trim();
-	if (!normalized) {
-		return 0;
-	}
-
-	return normalized.split(/\s+/).length;
-}
-
-function sanitizeSpokenText(text: string): string {
-	return text
-		.replace(/\r/g, '')
-		.replace(/(^|\n)\s*[-*]\s+/g, '$1')
-		.replace(/\n{2,}/g, '\n')
-		.replace(/\s+/g, ' ')
-		.trim();
 }
 
 function detectAudioExtension(audio: ArrayBuffer): string {
@@ -211,37 +182,6 @@ function getFileExtension(filePath: string): string {
 	}
 
 	return match[1] ?? 'mp3';
-}
-
-function trimTextToWordCount(text: string, maxWords: number): string {
-	const words = text.split(/\s+/);
-	if (words.length <= maxWords) {
-		return text;
-	}
-
-	const sentences = text.match(/[^.!?]+[.!?]?/g) ?? [text];
-	const kept: string[] = [];
-	let usedWords = 0;
-
-	for (const sentence of sentences) {
-		const sentenceWords = sentence.trim().split(/\s+/).filter(Boolean);
-		if (sentenceWords.length === 0) {
-			continue;
-		}
-
-		if (usedWords + sentenceWords.length > maxWords) {
-			break;
-		}
-
-		kept.push(sentence.trim());
-		usedWords += sentenceWords.length;
-	}
-
-	if (kept.length === 0) {
-		return words.slice(0, maxWords).join(' ').trim();
-	}
-
-	return kept.join(' ').trim();
 }
 
 function buildAnswerPrompt(
