@@ -323,16 +323,24 @@ GOAL
 
 - Optimize for speedrun-to-monetization: maximize discoverability and repeatability.
 - Prioritize high-impression packaging while staying true to the transcript.
+- The title must feel like a hook, not a copied question.
+- Compress the question into a sharper thesis; do not reuse it verbatim or near-verbatim.
 
 OUTPUT
 
 - Return one JSON object with keys: title, description, tags, categoryId, hashtags.
-- title: <= 100 chars, punchy, curiosity-first.
-- description: 3 short paragraphs, includes one CTA.
-- tags: 18-30 items, search intent + adjacent interests.
+- title: <= 70 chars, curiosity-first, outcome-led, concrete nouns preferred.
+- description: include the full transcript, then 2 short promo paragraphs and one CTA.
+- tags: 22-30 items, search intent + adjacent interests + brand terms + topic variants.
 - categoryId: one of "22", "27", "28".
-- hashtags: 8-12 items, lowercase, include # prefix.
+- hashtags: 10-15 items, lowercase, include # prefix, mix broad + specific + channel terms.
 - No markdown, no code fences, no extra keys.
+
+TITLE FRAMING EXAMPLES
+
+- "Why Integrity Quietly Decides Better Outcomes"
+- "How Small Habits Compound Into Big Results"
+- "The Hidden Advantage Most People Ignore"
 `;
 
 export function buildYoutubeMetadataPrompt(question: string, answer: string): string {
@@ -346,8 +354,12 @@ export function buildYoutubeMetadataPrompt(question: string, answer: string): st
 		'STRATEGY',
 		'',
 		'- Focus on broad but relevant high-impression topics.',
-		'- Use title framing that creates curiosity gap without clickbait spam.',
-		'- Keep metadata aligned to transcript for trust and long-term channel health.'
+		'- Compress the question into a concise hook; do not restate it verbatim.',
+		'- Prefer titles that promise a useful insight, surprising angle, or practical payoff.',
+		'- Use nouns and outcomes that a curious viewer would search for.',
+		'- Favor one of these structures: Why X..., How X..., The hidden X...',
+		'- Keep metadata aligned to transcript for trust and long-term channel health.',
+		'- Include brand-safe, search-friendly phrasing that could earn suggested traffic.'
 	].join('\n');
 }
 
