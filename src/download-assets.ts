@@ -1,3 +1,4 @@
+import { existsSync, statSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
@@ -54,8 +55,23 @@ async function downloadRainAsset(
 
 	console.log(`  Response status: ${response.status} ${response.statusText}`);
 	console.log(`  Writing to: ${destinationPath}`);
-	await Bun.write(destinationPath, response);
-	console.log(`  ✓ Downloaded successfully`);
+
+	try {
+		await Bun.write(destinationPath, response);
+	} catch (writeError) {
+		throw new Error(
+			`Failed to write file to ${destinationPath}: ${writeError instanceof Error ? writeError.message : String(writeError)}`
+		);
+	}
+
+	// Verify file was actually written
+	if (!existsSync(destinationPath)) {
+		throw new Error(`File write reported success but file does not exist at: ${destinationPath}`);
+	}
+
+	const stats = statSync(destinationPath);
+	console.log(`  ✓ File written: ${stats.size} bytes`);
+	console.log(`  ✓ File exists at: ${destinationPath}`);
 	console.log(`[${index + 1}/${total}] ✓ Complete: ${relativePath}`);
 }
 
@@ -86,6 +102,21 @@ async function main(): Promise<void> {
 	console.log(`\n════════════════════════════════════════════`);
 	console.log(`✓ Download Complete: ${files.length}/${files.length} file(s) saved`);
 	console.log(`  Output directory: ${OUTPUT_ROOT}`);
+
+	// Verify all files exist
+	console.log(`\nVerifying downloaded files:`);
+	for (const filePath of files) {
+		const destinationPath = resolve(OUTPUT_ROOT, filePath);
+		if (existsSync(destinationPath)) {
+			const stats = statSync(destinationPath);
+			console.log(`  ✓ ${filePath} (${stats.size} bytes)`);
+		} else {
+			console.log(`  ✗ MISSING: ${filePath}`);
+			console.log(`    Expected at: ${destinationPath}`);
+			throw new Error(`Downloaded file not found: ${destinationPath}`);
+		}
+	}
+
 	console.log(`════════════════════════════════════════════\n`);
 }
 
