@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, open, rename, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const R2_BUCKET_BASE_URL = process.env.R2_BUCKET_BASE_URL ?? 'https://cdn.earth-app.com';
@@ -54,11 +54,68 @@ async function downloadRainAsset(
 	}
 
 	console.log(`  Response status: ${response.status} ${response.statusText}`);
-	console.log(`  Writing to: ${destinationPath}`);
+	const contentLengthHeader = response.headers.get('content-length');
+	const expectedBytes = contentLengthHeader ? Number.parseInt(contentLengthHeader, 10) : NaN;
+	if (Number.isFinite(expectedBytes) && expectedBytes > 0) {
+		console.log(`  Content-Length: ${expectedBytes.toLocaleString()} bytes`);
+	} else {
+		console.log('  Content-Length: unknown');
+	}
+
+	const tempPath = `${destinationPath}.part`;
+	console.log(`  Streaming to temp file: ${tempPath}`);
+
+	let fileHandle: Awaited<ReturnType<typeof open>> | null = null;
+	let downloadedBytes = 0;
+	let progressNextMark = 50 * 1024 * 1024;
 
 	try {
-		await Bun.write(destinationPath, response);
+		fileHandle = await open(tempPath, 'w');
+		const reader = response.body.getReader();
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) {
+				break;
+			}
+
+			if (!value || value.byteLength === 0) {
+				continue;
+			}
+
+			await fileHandle.write(value);
+			downloadedBytes += value.byteLength;
+
+			if (downloadedBytes >= progressNextMark) {
+				if (Number.isFinite(expectedBytes) && expectedBytes > 0) {
+					const pct = ((downloadedBytes / expectedBytes) * 100).toFixed(1);
+					console.log(
+						`  Progress: ${downloadedBytes.toLocaleString()} / ${expectedBytes.toLocaleString()} bytes (${pct}%)`
+					);
+				} else {
+					console.log(`  Progress: ${downloadedBytes.toLocaleString()} bytes downloaded`);
+				}
+
+				progressNextMark += 50 * 1024 * 1024;
+			}
+		}
+
+		await fileHandle.close();
+		fileHandle = null;
+
+		if (downloadedBytes <= 0) {
+			throw new Error('No bytes were downloaded from response stream.');
+		}
+
+		console.log(`  Stream complete: ${downloadedBytes.toLocaleString()} bytes`);
+		await rename(tempPath, destinationPath);
+		console.log(`  Finalized file: ${destinationPath}`);
 	} catch (writeError) {
+		if (fileHandle) {
+			await fileHandle.close().catch(() => undefined);
+		}
+
+		await rm(tempPath, { force: true }).catch(() => undefined);
 		throw new Error(
 			`Failed to write file to ${destinationPath}: ${writeError instanceof Error ? writeError.message : String(writeError)}`
 		);
@@ -71,6 +128,11 @@ async function downloadRainAsset(
 
 	const stats = statSync(destinationPath);
 	console.log(`  ✓ File written: ${stats.size} bytes`);
+	if (Number.isFinite(expectedBytes) && expectedBytes > 0 && stats.size !== expectedBytes) {
+		throw new Error(
+			`Downloaded file size mismatch for ${relativePath}. Expected ${expectedBytes} bytes, got ${stats.size} bytes.`
+		);
+	}
 	console.log(`  ✓ File exists at: ${destinationPath}`);
 	console.log(`[${index + 1}/${total}] ✓ Complete: ${relativePath}`);
 }
