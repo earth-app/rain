@@ -30,12 +30,19 @@ async function downloadRainAsset(
 
 	const objectKey = `${RAIN_PREFIX}/${normalizedRelativePath}`;
 	const destinationPath = resolve(OUTPUT_ROOT, relativePath);
+	const destDir = dirname(destinationPath);
 	const objectUrl = `${R2_BUCKET_BASE_URL.replace(/\/+$/, '')}/${encodeS3Key(objectKey)}`;
 
-	console.log(`[${index + 1}/${total}] found ${objectKey}`);
+	console.log(`\n[${index + 1}/${total}] Asset: ${relativePath}`);
+	console.log(`  Source URL: ${objectUrl}`);
+	console.log(`  Destination: ${destinationPath}`);
+	console.log(`  Output directory: ${OUTPUT_ROOT}`);
 
-	await mkdir(dirname(destinationPath), { recursive: true });
+	console.log(`  Creating directory: ${destDir}`);
+	await mkdir(destDir, { recursive: true });
+	console.log(`  ✓ Directory created/ready`);
 
+	console.log(`  Fetching from ${objectUrl}...`);
 	const response = await fetch(objectUrl);
 	if (!response.ok || !response.body) {
 		const body = await response.text();
@@ -45,8 +52,11 @@ async function downloadRainAsset(
 		);
 	}
 
+	console.log(`  Response status: ${response.status} ${response.statusText}`);
+	console.log(`  Writing to: ${destinationPath}`);
 	await Bun.write(destinationPath, response);
-	console.log(`[${index + 1}/${total}] downloaded -> ${normalizedRelativePath}`);
+	console.log(`  ✓ Downloaded successfully`);
+	console.log(`[${index + 1}/${total}] ✓ Complete: ${relativePath}`);
 }
 
 async function main(): Promise<void> {
@@ -59,16 +69,24 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	console.log(
-		`Preparing to download ${files.length} known file(s) from ${R2_BUCKET_BASE_URL}/${RAIN_PREFIX}/`
-	);
-	console.log(`Output directory: ${OUTPUT_ROOT}`);
+	console.log(`\n════════════════════════════════════════════`);
+	console.log(`Asset Download Configuration:`);
+	console.log(`  Base URL: ${R2_BUCKET_BASE_URL}`);
+	console.log(`  Prefix: ${RAIN_PREFIX}`);
+	console.log(`  Output Root: ${OUTPUT_ROOT}`);
+	console.log(`  Known Assets: ${KNOWN_ASSET_PATHS.join(', ')}`);
+	console.log(`════════════════════════════════════════════\n`);
+
+	console.log(`Preparing to download ${files.length} known file(s):\n`);
 
 	for (const [index, filePath] of files.entries()) {
 		await downloadRainAsset(filePath, index, files.length);
 	}
 
-	console.log(`Download complete: ${files.length}/${files.length} file(s) saved to ${OUTPUT_ROOT}`);
+	console.log(`\n════════════════════════════════════════════`);
+	console.log(`✓ Download Complete: ${files.length}/${files.length} file(s) saved`);
+	console.log(`  Output directory: ${OUTPUT_ROOT}`);
+	console.log(`════════════════════════════════════════════\n`);
 }
 
 main().catch((error) => {
