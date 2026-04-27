@@ -47,7 +47,7 @@ Additional outputs:
   - Hard minimum: `30s`.
   - Preferred range: `60s+`, with attempts centered around `80-85s`.
 - Captions: phrase-level closed captions tuned for spoken pacing.
-- Background: random 75-90 second window sampled from `src/assets/minecraft.mp4`.
+- Background: random 75-90 second window sampled from `src/assets/downloaded/minecraft.mp4`.
 - Watermark: persistent Earth App logo at bottom-right.
 
 Implementation approach (research-aligned):

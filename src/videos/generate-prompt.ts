@@ -34,7 +34,7 @@ const WORKSPACE_ROOT = process.cwd();
 const PUBLIC_DIR = resolve(WORKSPACE_ROOT, 'src/assets');
 const GENERATED_DIR = resolve(PUBLIC_DIR, 'generated');
 const OUT_DIR = resolve(WORKSPACE_ROOT, 'out');
-const MINECRAFT_PATH = resolve(PUBLIC_DIR, 'minecraft.mp4');
+const MINECRAFT_PATH = resolve(PUBLIC_DIR, 'downloaded', 'minecraft.mp4');
 
 const RENDER_ENTRY = resolve(WORKSPACE_ROOT, 'src/videos/index.ts');
 const RENDER_COMPOSITION_ID = 'PromptShort';

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "download:assets": "bun src/download-assets.ts",
     "photo:activity": "bun src/photos/index.ts --type=activity",
     "photo:prompt": "bun src/photos/index.ts --type=prompt",
     "photo:event": "bun src/photos/index.ts --type=event",

@@ -97,7 +97,7 @@ export const PromptShortComposition: React.FC<PromptVideoProps> = (props) => {
 
 			<AbsoluteFill style={{ overflow: 'hidden' }}>
 				<OffthreadVideo
-					src={staticFile('minecraft.mp4')}
+					src={staticFile('downloaded/minecraft.mp4')}
 					trimBefore={trimBefore}
 					trimAfter={trimAfter}
 					muted
