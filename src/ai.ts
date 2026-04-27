@@ -17,12 +17,61 @@ type CloudflareAIResponse = {
 	response?: unknown;
 };
 
+type TextGenerationOptions = {
+	responseFormat?:
+		| {
+				type: 'json_schema';
+				jsonSchema: Record<string, unknown>;
+		  }
+		| {
+				type: 'json_object';
+		  };
+};
+
 export type YoutubeMetadataDraft = {
 	title: string;
 	description: string;
 	tags: string[];
 	categoryId: '22' | '27' | '28';
 	hashtags: string[];
+};
+
+const youtubeMetadataAiSchema: Record<string, unknown> = {
+	type: 'object',
+	properties: {
+		title: {
+			type: 'string',
+			maxLength: 100
+		},
+		description: {
+			type: 'string',
+			maxLength: 5000
+		},
+		tags: {
+			type: 'array',
+			minItems: 18,
+			maxItems: 30,
+			items: {
+				type: 'string',
+				maxLength: 60
+			}
+		},
+		categoryId: {
+			type: 'string',
+			enum: ['22', '27', '28']
+		},
+		hashtags: {
+			type: 'array',
+			minItems: 8,
+			maxItems: 12,
+			items: {
+				type: 'string',
+				pattern: '^#',
+				maxLength: 60
+			}
+		}
+	},
+	required: ['title', 'description', 'tags', 'categoryId', 'hashtags']
 };
 
 function getCloudflareCredentials(): { accountId: string; apiToken: string } {
@@ -177,6 +226,30 @@ function getTextFromCloudflareResponse(json: CloudflareAIResponse): string | nul
 	return null;
 }
 
+function getObjectFromCloudflareResponse(
+	json: CloudflareAIResponse
+): Record<string, unknown> | null {
+	if (json.response && typeof json.response === 'object' && !Array.isArray(json.response)) {
+		return json.response as Record<string, unknown>;
+	}
+
+	if (json.result && typeof json.result === 'object' && !Array.isArray(json.result)) {
+		const resultRecord = json.result as Record<string, unknown>;
+
+		if (
+			resultRecord.response &&
+			typeof resultRecord.response === 'object' &&
+			!Array.isArray(resultRecord.response)
+		) {
+			return resultRecord.response as Record<string, unknown>;
+		}
+
+		return resultRecord;
+	}
+
+	return null;
+}
+
 export async function tts(text: string): Promise<ArrayBuffer> {
 	const normalized = text.trim();
 	if (!normalized) {
@@ -278,7 +351,11 @@ export function buildYoutubeMetadataPrompt(question: string, answer: string): st
 	].join('\n');
 }
 
-export async function generateText(system: string, prompt: string): Promise<string> {
+export async function generateText(
+	system: string,
+	prompt: string,
+	options?: TextGenerationOptions
+): Promise<string> {
 	const normalizedSystem = system.trim();
 	const normalizedPrompt = prompt.trim();
 
@@ -295,10 +372,30 @@ export async function generateText(system: string, prompt: string): Promise<stri
 			messages: [
 				{ role: 'system', content: normalizedSystem },
 				{ role: 'user', content: normalizedPrompt }
-			]
+			],
+			...(options?.responseFormat
+				? {
+						response_format:
+							options.responseFormat.type === 'json_schema'
+								? {
+										type: 'json_schema',
+										json_schema: options.responseFormat.jsonSchema
+									}
+								: {
+										type: 'json_object'
+									}
+					}
+				: {})
 		},
 		TEXT_MODEL
 	);
+
+	if (options?.responseFormat) {
+		const structured = getObjectFromCloudflareResponse(json);
+		if (structured) {
+			return JSON.stringify(structured);
+		}
+	}
 
 	const text = getTextFromCloudflareResponse(json);
 	if (!text) {
@@ -321,30 +418,41 @@ export async function generateYoutubeMetadataDraft(
 ): Promise<Partial<YoutubeMetadataDraft>> {
 	const raw = await generateText(
 		systemPromptYoutubeMetadata,
-		buildYoutubeMetadataPrompt(question, answer)
+		buildYoutubeMetadataPrompt(question, answer),
+		{
+			responseFormat: {
+				type: 'json_schema',
+				jsonSchema: youtubeMetadataAiSchema
+			}
+		}
 	);
 	const parsed = extractJsonObject(raw);
 	if (!parsed) {
 		return {};
 	}
 
+	const structured =
+		parsed.response && typeof parsed.response === 'object' && !Array.isArray(parsed.response)
+			? (parsed.response as Record<string, unknown>)
+			: parsed;
+
 	const title =
-		typeof parsed.title === 'string'
-			? trimToLength(normalizeWhitespace(parsed.title), 100)
+		typeof structured.title === 'string'
+			? trimToLength(normalizeWhitespace(structured.title), 100)
 			: undefined;
 	const description =
-		typeof parsed.description === 'string'
-			? trimToLength(normalizeWhitespace(parsed.description), 5000)
+		typeof structured.description === 'string'
+			? trimToLength(normalizeWhitespace(structured.description), 5000)
 			: undefined;
 	const categoryId =
-		typeof parsed.categoryId === 'string' && ['22', '27', '28'].includes(parsed.categoryId)
-			? (parsed.categoryId as '22' | '27' | '28')
+		typeof structured.categoryId === 'string' && ['22', '27', '28'].includes(structured.categoryId)
+			? (structured.categoryId as '22' | '27' | '28')
 			: undefined;
-	const tags = Array.isArray(parsed.tags)
-		? parsed.tags.filter((tag): tag is string => typeof tag === 'string')
+	const tags = Array.isArray(structured.tags)
+		? structured.tags.filter((tag): tag is string => typeof tag === 'string')
 		: undefined;
-	const hashtags = Array.isArray(parsed.hashtags)
-		? parsed.hashtags.filter((tag): tag is string => typeof tag === 'string')
+	const hashtags = Array.isArray(structured.hashtags)
+		? structured.hashtags.filter((tag): tag is string => typeof tag === 'string')
 		: undefined;
 
 	return {

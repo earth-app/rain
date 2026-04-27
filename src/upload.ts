@@ -227,6 +227,25 @@ function chooseCategoryIdFromText(text: string): string {
 	return '22'; // People & Blogs
 }
 
+function buildFallbackTitle(question: string): string {
+	const normalizedQuestion = normalizeWhitespace(question).replace(/[?!.]+$/g, '');
+	if (!normalizedQuestion) {
+		return 'Curiosity Prompt: Think Deeper Today';
+	}
+
+	const withQuestionMark = `${normalizedQuestion}?`;
+	return trimToLength(withQuestionMark, MAX_TITLE_LENGTH);
+}
+
+function pickBestTitle(aiTitle: string | undefined, fallbackTitle: string): string {
+	const normalizedAiTitle = typeof aiTitle === 'string' ? normalizeWhitespace(aiTitle) : '';
+	if (normalizedAiTitle.length >= 8) {
+		return trimToLength(normalizedAiTitle, MAX_TITLE_LENGTH);
+	}
+
+	return fallbackTitle;
+}
+
 function buildFallbackMetadata(question: string, answer: string): GeneratedMetadata {
 	const normalizedQuestion = normalizeWhitespace(question).replace(/[?!.]+$/g, '');
 	const dynamicTags = buildDynamicTags(question, answer);
@@ -237,10 +256,7 @@ function buildFallbackMetadata(question: string, answer: string): GeneratedMetad
 		)
 	).slice(0, 12);
 
-	const title = trimToLength(
-		normalizeWhitespace(`Push Past Routine Limits? Hidden Benefits Explained`),
-		MAX_TITLE_LENGTH
-	);
+	const title = buildFallbackTitle(question);
 
 	const answerSnippet = trimToLength(normalizeWhitespace(answer), 850);
 	const description = trimToLength(
@@ -307,7 +323,7 @@ async function buildOptimizedMetadata(
 		);
 
 		return {
-			title: ai.title ?? fallback.title,
+			title: pickBestTitle(ai.title, fallback.title),
 			description,
 			tags: mergedTags.length > 0 ? mergedTags : fallback.tags,
 			categoryId: ai.categoryId ?? chooseCategoryIdFromText(`${question} ${answer} ${description}`),
