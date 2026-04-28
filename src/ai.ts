@@ -5,6 +5,7 @@ const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 
 const TTS_MODEL = '@cf/myshell-ai/melotts';
 const TEXT_MODEL = '@cf/ibm-granite/granite-4.0-h-micro';
+const RERANKER_MODEL = '@cf/baai/bge-reranker-base';
 
 type CloudflareError = {
 	message?: string;
@@ -26,6 +27,11 @@ type TextGenerationOptions = {
 		| {
 				type: 'json_object';
 		  };
+};
+
+type RankedContext = {
+	id?: number;
+	score?: number;
 };
 
 export type YoutubeMetadataDraft = {
@@ -248,6 +254,88 @@ function getObjectFromCloudflareResponse(
 	}
 
 	return null;
+}
+
+function getRankedContextsFromResponse(json: CloudflareAIResponse): RankedContext[] {
+	const response = json.response;
+	if (Array.isArray(response)) {
+		return response as RankedContext[];
+	}
+
+	const result = json.result;
+	if (Array.isArray(result)) {
+		return result as RankedContext[];
+	}
+
+	if (result && typeof result === 'object') {
+		const record = result as Record<string, unknown>;
+		if (Array.isArray(record.response)) {
+			return record.response as RankedContext[];
+		}
+		if (Array.isArray(record.result)) {
+			return record.result as RankedContext[];
+		}
+	}
+
+	return [];
+}
+
+function buildTitleRerankerQuery(question: string, answer: string): string {
+	const normalizedQuestion = normalizeWhitespace(question);
+	const normalizedAnswer = trimToLength(normalizeWhitespace(answer), 1800);
+
+	return [
+		'YouTube Shorts title selection task.',
+		'',
+		`Question: ${normalizedQuestion}`,
+		'',
+		`Answer transcript: ${normalizedAnswer}`,
+		'',
+		'Rank titles that are accurate, specific, curiosity-driven, and likely to earn clicks without sounding false.'
+	].join('\n');
+}
+
+export async function selectBestYoutubeTitle(
+	question: string,
+	answer: string,
+	titles: string[]
+): Promise<string> {
+	const cleanedTitles = titles
+		.map((title) => trimToLength(normalizeWhitespace(title), 100))
+		.filter((title, index, all) => Boolean(title) && all.indexOf(title) === index);
+
+	if (cleanedTitles.length === 0) {
+		throw new Error('No title candidates provided');
+	}
+
+	if (cleanedTitles.length === 1) {
+		return cleanedTitles[0]!;
+	}
+
+	try {
+		const json = await runCloudflareModel(
+			{
+				query: buildTitleRerankerQuery(question, answer),
+				contexts: cleanedTitles.map((title) => ({ text: title })),
+				top_k: cleanedTitles.length
+			},
+			RERANKER_MODEL
+		);
+
+		const ranked = getRankedContextsFromResponse(json)
+			.filter(
+				(item) => typeof item.id === 'number' && item.id >= 0 && item.id < cleanedTitles.length
+			)
+			.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+		if (ranked.length > 0) {
+			return cleanedTitles[ranked[0]!.id!] ?? cleanedTitles[0]!;
+		}
+	} catch (error) {
+		console.warn('Title reranking failed, using heuristic fallback.', error);
+	}
+
+	return cleanedTitles[0]!;
 }
 
 export async function tts(text: string): Promise<ArrayBuffer> {

@@ -163,6 +163,44 @@ const DEFAULT_STOP_WORDS = new Set([
 	'your'
 ]);
 
+const TITLE_BLACKLIST_WORDS = new Set([
+	'way',
+	'ways',
+	'thing',
+	'things',
+	'stuff',
+	'result',
+	'results',
+	'outcome',
+	'outcomes',
+	'context',
+	'contexts',
+	'problem',
+	'problems',
+	'solution',
+	'solutions',
+	'change',
+	'changes',
+	'better',
+	'best',
+	'more',
+	'less',
+	'people',
+	'person',
+	'someone',
+	'something',
+	'everything',
+	'anything',
+	'nothing',
+	'collective',
+	'personal',
+	'professional',
+	'practice',
+	'practices',
+	'impact',
+	'impacts'
+]);
+
 export function toHashtag(value: string): string {
 	const compact = value
 		.toLowerCase()
@@ -228,7 +266,7 @@ export function choosePrimaryKeyword(
 	const priorityWords = [...questionWords, ...answerWords];
 
 	for (const word of priorityWords) {
-		if (!stopWords.has(word) && word.length >= 4) {
+		if (!stopWords.has(word) && !TITLE_BLACKLIST_WORDS.has(word) && word.length >= 4) {
 			return word;
 		}
 	}
@@ -360,6 +398,11 @@ export function buildFallbackTitle(question: string): string {
 		const idx = score % options.length;
 		return options[idx] ?? options[0] ?? normalizedQuestion;
 	};
+	const isHowStyle =
+		lowered.startsWith('how ') ||
+		lowered.startsWith('in what ways') ||
+		lowered.startsWith('what ways') ||
+		lowered.startsWith('what way');
 
 	if (lowered.startsWith('why ')) {
 		return trimToLength(
@@ -372,7 +415,7 @@ export function buildFallbackTitle(question: string): string {
 		);
 	}
 
-	if (lowered.startsWith('how ')) {
+	if (isHowStyle) {
 		return trimToLength(
 			pickByKeyword([
 				`How ${keywordTitle} Changes Outcomes Fast`,
@@ -424,6 +467,60 @@ export function buildFallbackTitle(question: string): string {
 		]),
 		100
 	);
+}
+
+export function buildYoutubeTitleCandidates(
+	question: string,
+	answer: string,
+	aiTitle?: string
+): string[] {
+	const primaryKeyword = choosePrimaryKeyword(question, answer);
+	const keywordTitle = toTitleWord(primaryKeyword);
+	const normalizedQuestion = normalizeWhitespace(question).toLowerCase();
+	const candidates: string[] = [];
+	const seen = new Set<string>();
+
+	const add = (value: string) => {
+		const normalized = trimToLength(normalizeWhitespace(value), 100);
+		if (!normalized) {
+			return;
+		}
+
+		const key = normalized.toLowerCase();
+		if (seen.has(key)) {
+			return;
+		}
+
+		seen.add(key);
+		candidates.push(normalized);
+	};
+
+	if (typeof aiTitle === 'string' && aiTitle.trim()) {
+		add(aiTitle);
+	}
+
+	add(buildFallbackTitle(question));
+	add(`Why ${keywordTitle} Matters More Than It Seems`);
+	add(`How ${keywordTitle} Changes Outcomes Fast`);
+	add(`Why ${keywordTitle} Quietly Decides Better Outcomes`);
+	add(`${keywordTitle}: The Hidden Advantage Most People Miss`);
+	add(`${keywordTitle}: The Overlooked Lever for Better Results`);
+	add(`How ${keywordTitle} Turns Good Effort Into Better Results`);
+	add(`Can ${keywordTitle} Really Change Results?`);
+	add(`${keywordTitle} Can Quietly Change Everything`);
+	add(`${keywordTitle}: Small Shift, Big Outcome`);
+
+	if (normalizedQuestion.startsWith('when ') || normalizedQuestion.startsWith('in what ways')) {
+		add(`When ${keywordTitle} Starts Changing Everything`);
+		add(`When ${keywordTitle} Becomes Your Competitive Advantage`);
+	}
+
+	if (normalizedQuestion.startsWith('what ') || normalizedQuestion.startsWith('what ways')) {
+		add(`What ${keywordTitle} Reveals About Better Outcomes`);
+		add(`What ${keywordTitle} Changes in Real Life`);
+	}
+
+	return candidates;
 }
 
 export function buildFallbackHashtags(question: string, answer: string, tags: string[]): string[] {
